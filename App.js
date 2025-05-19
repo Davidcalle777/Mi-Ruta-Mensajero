@@ -1,9 +1,6 @@
 import { useState } from 'react';
 import { Alert, Button, Linking, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import axios from 'axios';
-import { Link } from "react-scroll";
-
-
 
 const OPENCAGE_API_KEY = '02693cf849024a108afc12ce2a4403a4'; // reemplaza por la tuya
 
@@ -18,6 +15,7 @@ const geocodeDireccion = async (direccion) => {
     throw new Error('No se encontró la dirección');
   }
 };
+
 //Usa esta función para ordenar las direcciones por cercanía
 const ordenarPorRuta = async () => {
   try {
@@ -56,8 +54,6 @@ const ordenarPorRuta = async () => {
   }
 };
 
-
-
 export default function App() {
   const [direccion, setDireccion] = useState('');
   const [direcciones, setDirecciones] = useState([]);
@@ -69,52 +65,70 @@ export default function App() {
     setDireccion('');
   };
 
+  const borrarDireccion = (index) => {
+    if (Platform.OS === 'web') {
+      if (window.confirm("¿Borrar esta dirección?")) {
+        const nuevasDirecciones = [...direcciones];
+        nuevasDirecciones.splice(index, 1);
+        setDirecciones(nuevasDirecciones);
+      }
+    } else {
+      Alert.alert("Confirmar", "¿Borrar esta dirección?", [
+        { text: "Cancelar", style: "cancel" },
+        { text: "Borrar", onPress: () => {
+          const nuevasDirecciones = [...direcciones];
+          nuevasDirecciones.splice(index, 1);
+          setDirecciones(nuevasDirecciones);
+        }}
+      ]);
+    }
+  };
+
   const ordenarDirecciones = () => {
-  const TIPOS_ORDEN = ['avenida', 'av', 'carrera', 'cra', 'calle', 'cl', 'diagonal', 'dg', 'transversal', 'tv', 'circular', 'cir', 'otros'];
+    const TIPOS_ORDEN = ['avenida', 'av', 'carrera', 'cra', 'calle', 'cl', 'diagonal', 'dg', 'transversal', 'tv', 'circular', 'cir', 'otros'];
 
-  const normalizarTipo = (texto) => {
-    const tipoEncontrado = TIPOS_ORDEN.find(tipo => texto.startsWith(tipo));
-    return tipoEncontrado || 'otros';
-  };
-
-  const parseDireccion = (dir) => {
-    const texto = dir.toLowerCase().replace(/\./g, '').trim();
-
-    const tipo = normalizarTipo(texto);
-    const tipoIndex = TIPOS_ORDEN.indexOf(tipo);
-
-    const matchNumero = texto.match(/\d+/);
-    const numero = matchNumero ? parseInt(matchNumero[0]) : 0;
-
-    const matchCasa = texto.match(/#\s*(\d+)/);
-    const numeroCasa = matchCasa ? parseInt(matchCasa[1]) : 0;
-
-    return {
-      tipo,
-      tipoIndex,
-      numero,
-      numeroCasa,
-      original: dir,
+    const normalizarTipo = (texto) => {
+      const tipoEncontrado = TIPOS_ORDEN.find(tipo => texto.startsWith(tipo));
+      return tipoEncontrado || 'otros';
     };
+
+    const parseDireccion = (dir) => {
+      const texto = dir.toLowerCase().replace(/\./g, '').trim();
+
+      const tipo = normalizarTipo(texto);
+      const tipoIndex = TIPOS_ORDEN.indexOf(tipo);
+
+      const matchNumero = texto.match(/\d+/);
+      const numero = matchNumero ? parseInt(matchNumero[0]) : 0;
+
+      const matchCasa = texto.match(/#\s*(\d+)/);
+      const numeroCasa = matchCasa ? parseInt(matchCasa[1]) : 0;
+
+      return {
+        tipo,
+        tipoIndex,
+        numero,
+        numeroCasa,
+        original: dir,
+      };
+    };
+
+    const ordenadas = [...direcciones]
+      .map(parseDireccion)
+      .sort((a, b) => {
+        if (a.tipoIndex !== b.tipoIndex) {
+          return ascendente ? a.tipoIndex - b.tipoIndex : b.tipoIndex - a.tipoIndex;
+        }
+        if (a.numero !== b.numero) {
+          return ascendente ? a.numero - b.numero : b.numero - a.numero;
+        }
+        return ascendente ? a.numeroCasa - b.numeroCasa : b.numeroCasa - a.numeroCasa;
+      })
+      .map(d => d.original);
+
+    setDirecciones(ordenadas);
+    setAscendente(!ascendente);
   };
-
-  const ordenadas = [...direcciones]
-    .map(parseDireccion)
-    .sort((a, b) => {
-      if (a.tipoIndex !== b.tipoIndex) {
-        return ascendente ? a.tipoIndex - b.tipoIndex : b.tipoIndex - a.tipoIndex;
-      }
-      if (a.numero !== b.numero) {
-        return ascendente ? a.numero - b.numero : b.numero - a.numero;
-      }
-      return ascendente ? a.numeroCasa - b.numeroCasa : b.numeroCasa - a.numeroCasa;
-    })
-    .map(d => d.original);
-
-  setDirecciones(ordenadas);
-  setAscendente(!ascendente);
-};
-
 
   const borrarTodo = () => {
     if (Platform.OS === 'web') {
@@ -143,50 +157,67 @@ export default function App() {
   };
 
   return (
-  <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
-    <View style={styles.container}>
-      <Text style={styles.title}>📍 Mi Ruta Mensajero</Text>
+    <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
+      <View style={styles.container}>
+        <Text style={styles.title}>📍 Mi Ruta Mensajero</Text>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Ingresa dirección"
-        value={direccion}
-        onChangeText={setDireccion}
-      />
+        <TextInput
+          style={styles.input}
+          placeholder="Ingresa dirección"
+          value={direccion}
+          onChangeText={setDireccion}
+        />
 
-      <Button title="Agregar Dirección" onPress={agregarDireccion} />
+        <Button title="Agregar Dirección" onPress={agregarDireccion} />
 
-      <View style={styles.buttonRow}>
-        <Button title={`Ordenar (${ascendente ? 'Asc' : 'Desc'})`} onPress={ordenarDirecciones} />
-        <Button title="Borrar Todo" color="red" onPress={borrarTodo} />
+        <View style={styles.buttonRow}>
+          <Button title={`Ordenar (${ascendente ? 'Asc' : 'Desc'})`} onPress={ordenarDirecciones} />
+          
+        </View>
+
+        {direcciones.map((item, index) => (
+          <View key={index} style={styles.item}>
+            <Text style={styles.dir}>{item}</Text>
+            <View style={styles.navButtons}>
+              <TouchableOpacity onPress={() => abrirNavegador(item, 'google')}>
+                <Text style={styles.link}>Google Maps</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => abrirNavegador(item, 'waze')}>
+                <Text style={styles.link}>Waze</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.deleteButton} onPress={() => borrarDireccion(index)}>
+                <Text style={styles.deleteButtonText}>Borrar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ))}
+
       </View>
-
-      {direcciones.map((item, index) => (
-  <View key={index} style={styles.item}>
-    <Text style={styles.dir}>{item}</Text>
-    <View style={styles.navButtons}>
-      <TouchableOpacity onPress={() => abrirNavegador(item, 'google')}>
-        <Text style={styles.link}>Google Maps</Text>
-      </TouchableOpacity>
-      <TouchableOpacity onPress={() => abrirNavegador(item, 'waze')}>
-        <Text style={styles.link}>Waze</Text>
-      </TouchableOpacity>
-    </View>
-  </View>
-))}
-
-    </View>
-  </ScrollView>
-);
+    </ScrollView>
+  );
 }
 
 const styles = StyleSheet.create({
+  scrollContainer: {
+    flexGrow: 1,
+  },
   container: { flex: 1, padding: 20, backgroundColor: '#ffffff' },
   title: { fontSize: 24, fontWeight: 'bold', marginBottom: 10, textAlign: 'center', color: '#004d66' },
   input: { borderWidth: 1, borderColor: '#aaa', padding: 10, borderRadius: 10, marginBottom: 10 },
   buttonRow: { flexDirection: 'row', justifyContent: 'space-between', marginVertical: 10 },
   item: { backgroundColor: '#fff', padding: 10, borderRadius: 10, marginVertical: 5 },
-  dir: { fontSize: 16 },
-  navButtons: { flexDirection: 'row', justifyContent: 'space-around', marginTop: 5 },
-  link: { color: '#0066cc', textDecorationLine: 'underline' },
+  dir: { fontSize: 16, flexShrink: 1 },
+  navButtons: { flexDirection: 'row', justifyContent: 'space-around', marginTop: 5, alignItems: 'center' },
+  link: { color: '#0066cc', textDecorationLine: 'underline', marginHorizontal: 5 },
+  deleteButton: {
+    backgroundColor: '#dc3545',
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 5,
+    marginLeft: 5,
+  },
+  deleteButtonText: {
+    color: '#fff',
+    fontSize: 14,
+  },
 });

@@ -1,5 +1,62 @@
 import { useState } from 'react';
-import { Alert, Button, Linking, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Button, Linking, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import axios from 'axios';
+import { Link } from "react-scroll";
+
+
+
+const OPENCAGE_API_KEY = '02693cf849024a108afc12ce2a4403a4'; // reemplaza por la tuya
+
+const geocodeDireccion = async (direccion) => {
+  const url = `https://api.opencagedata.com/geocode/v1/json?q=${encodeURIComponent(direccion + ', Medellín, Colombia')}&key=${OPENCAGE_API_KEY}`;
+  const response = await axios.get(url);
+  const { results } = response.data;
+  if (results.length > 0) {
+    const { lat, lng } = results[0].geometry;
+    return { lat, lng, direccion };
+  } else {
+    throw new Error('No se encontró la dirección');
+  }
+};
+//Usa esta función para ordenar las direcciones por cercanía
+const ordenarPorRuta = async () => {
+  try {
+    const coordenadas = await Promise.all(
+      direcciones.map(dir => geocodeDireccion(dir))
+    );
+
+    const origen = coordenadas[0];
+
+    const calcularDistancia = (a, b) => {
+      const dx = a.lat - b.lat;
+      const dy = a.lng - b.lng;
+      return Math.sqrt(dx * dx + dy * dy);
+    };
+
+    const ordenadas = [origen];
+    const restantes = coordenadas.slice(1);
+
+    while (restantes.length > 0) {
+      const ultimo = ordenadas[ordenadas.length - 1];
+      let masCerca = 0;
+      for (let i = 1; i < restantes.length; i++) {
+        if (
+          calcularDistancia(ultimo, restantes[i]) <
+          calcularDistancia(ultimo, restantes[masCerca])
+        ) {
+          masCerca = i;
+        }
+      }
+      ordenadas.push(restantes.splice(masCerca, 1)[0]);
+    }
+
+    setDirecciones(ordenadas.map(p => p.direccion));
+  } catch (error) {
+    alert('Error al ordenar: ' + error.message);
+  }
+};
+
+
 
 export default function App() {
   const [direccion, setDireccion] = useState('');
@@ -86,6 +143,7 @@ export default function App() {
   };
 
   return (
+  <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
     <View style={styles.container}>
       <Text style={styles.title}>📍 Mi Ruta Mensajero</Text>
 
@@ -99,31 +157,27 @@ export default function App() {
       <Button title="Agregar Dirección" onPress={agregarDireccion} />
 
       <View style={styles.buttonRow}>
-        <Button title={`Ordenar (${ascendente ? 'A-Z' : 'Z-A'})`} onPress={ordenarDirecciones} />
+        <Button title={`Ordenar (${ascendente ? 'Asc' : 'Desc'})`} onPress={ordenarDirecciones} />
         <Button title="Borrar Todo" color="red" onPress={borrarTodo} />
       </View>
 
-      {direcciones.length === 0 ? (
-        <Text style={{ textAlign: 'center', marginTop: 20, color: '#999' }}>
-          No hay direcciones registradas.
-        </Text>
-      ) : (
-        direcciones.map((item, index) => (
-          <View key={index} style={styles.item}>
-            <Text style={styles.dir}>{item}</Text>
-            <View style={styles.navButtons}>
-              <TouchableOpacity onPress={() => abrirNavegador(item, 'google')}>
-                <Text style={styles.link}>Google Maps</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => abrirNavegador(item, 'waze')}>
-                <Text style={styles.link}>Waze</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        ))
-      )}
+      {direcciones.map((item, index) => (
+  <View key={index} style={styles.item}>
+    <Text style={styles.dir}>{item}</Text>
+    <View style={styles.navButtons}>
+      <TouchableOpacity onPress={() => abrirNavegador(item, 'google')}>
+        <Text style={styles.link}>Google Maps</Text>
+      </TouchableOpacity>
+      <TouchableOpacity onPress={() => abrirNavegador(item, 'waze')}>
+        <Text style={styles.link}>Waze</Text>
+      </TouchableOpacity>
     </View>
-  );
+  </View>
+))}
+
+    </View>
+  </ScrollView>
+);
 }
 
 const styles = StyleSheet.create({

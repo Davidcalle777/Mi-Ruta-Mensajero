@@ -1,16 +1,23 @@
 import { useState } from 'react';
 import {
-  Button,
+  Alert,
   Linking,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
-  Alert
+  View
 } from 'react-native';
+
+// Colores corporativos
+const coloresCorporativos = {
+  verde: '#2E7D32',
+  azulRey: '#0033A0',
+  gris: '#666666',
+  fondo: '#F5F5F5',
+  textoClaro: '#ffffff'
+};
 
 function parseDireccionPrecisa(direccion) {
   const regex = /\b(Calle|Cl|Cll|Carrera|Cra|Cr|Diagonal|Dg|Transversal|Tv)\s*(\d+)\s*([A-Z]{0,3})?\s*#\s*(\d+)\s*([A-Z]{0,3})?\s*(?:-|)?\s*(\d+)/i;
@@ -64,26 +71,11 @@ function parseDireccionPrecisa(direccion) {
 }
 
 function compararDirecciones(a, b) {
-  if (a.tipo !== b.tipo) {
-    return a.tipo.localeCompare(b.tipo);
-  }
-
-  if (a.viaNum !== b.viaNum) {
-    return a.viaNum - b.viaNum;
-  }
-
-  if (a.viaLetra !== b.viaLetra) {
-    return a.viaLetra.localeCompare(b.viaLetra);
-  }
-
-  if (a.interseccionNum !== b.interseccionNum) {
-    return a.interseccionNum - b.interseccionNum;
-  }
-
-  if (a.interseccionLetra !== b.interseccionLetra) {
-    return a.interseccionLetra.localeCompare(b.interseccionLetra);
-  }
-
+  if (a.tipo !== b.tipo) return a.tipo.localeCompare(b.tipo);
+  if (a.viaNum !== b.viaNum) return a.viaNum - b.viaNum;
+  if (a.viaLetra !== b.viaLetra) return a.viaLetra.localeCompare(b.viaLetra);
+  if (a.interseccionNum !== b.interseccionNum) return a.interseccionNum - b.interseccionNum;
+  if (a.interseccionLetra !== b.interseccionLetra) return a.interseccionLetra.localeCompare(b.interseccionLetra);
   return a.puerta - b.puerta;
 }
 
@@ -94,34 +86,29 @@ export default function App() {
 
   const agregarDireccion = () => {
     const dirTrimmed = direccion.trim();
-
     if (dirTrimmed === '') return;
-
-    // Verificar si ya existe (sin alertas)
     const yaExiste = direcciones.some(d => d.trim().toLowerCase() === dirTrimmed.toLowerCase());
     if (yaExiste) {
       setDireccion('');
       return;
     }
-
     setDirecciones([...direcciones, dirTrimmed]);
     setDireccion('');
   };
 
   const borrarDireccion = (index) => {
-    const nuevasDirecciones = [...direcciones];
-    nuevasDirecciones.splice(index, 1);
-    setDirecciones(nuevasDirecciones);
+    const nuevas = [...direcciones];
+    nuevas.splice(index, 1);
+    setDirecciones(nuevas);
   };
 
   const ordenarDirecciones = () => {
-    const direccionesParseadas = direcciones.map(d => ({
+    const parseadas = direcciones.map(d => ({
       original: d,
       parsed: parseDireccionPrecisa(d),
     }));
-
-    const conParseo = direccionesParseadas.filter(d => d.parsed !== null);
-    const sinParseo = direccionesParseadas.filter(d => d.parsed === null);
+    const conParseo = parseadas.filter(d => d.parsed !== null);
+    const sinParseo = parseadas.filter(d => d.parsed === null);
 
     conParseo.sort((a, b) =>
       ascendente
@@ -129,25 +116,18 @@ export default function App() {
         : compararDirecciones(b.parsed, a.parsed)
     );
 
-    const listaOrdenada = [...conParseo, ...sinParseo].map(d => d.original);
-
-    setDirecciones(listaOrdenada);
+    setDirecciones([...conParseo, ...sinParseo].map(d => d.original));
     setAscendente(!ascendente);
   };
 
-  const borrarTodo = () => {
-    setDirecciones([]);
-  };
+  const borrarTodo = () => setDirecciones([]);
 
   const abrirNavegador = (direccion, navegador) => {
     const query = encodeURIComponent(direccion + ', Medellín, Colombia');
-    let url = '';
-
-    if (navegador === 'google') {
-      url = `https://www.google.com/maps/search/?api=1&query=${query}`;
-    } else if (navegador === 'waze') {
-      url = `https://waze.com/ul?q=${query}`;
-    }
+    const url =
+      navegador === 'google'
+        ? `https://www.google.com/maps/search/?api=1&query=${query}`
+        : `https://waze.com/ul?q=${query}`;
 
     Linking.openURL(url).catch(() =>
       Alert.alert("Error", "No se pudo abrir el navegador")
@@ -166,11 +146,20 @@ export default function App() {
           onChangeText={setDireccion}
         />
 
-        <Button title="Agregar Dirección" onPress={agregarDireccion} />
+        <TouchableOpacity style={styles.addButton} onPress={agregarDireccion}>
+          <Text style={styles.buttonText}>Agregar Dirección</Text>
+        </TouchableOpacity>
 
         <View style={styles.buttonRow}>
-          <Button title={`Ordenar (${ascendente ? 'Asc' : 'Desc'})`} onPress={ordenarDirecciones} />
-          <Button title="Borrar Todo" onPress={borrarTodo} />
+          <TouchableOpacity style={styles.secondaryButton} onPress={ordenarDirecciones}>
+            <Text style={styles.buttonText}>
+              Ordenar ({ascendente ? 'Asc' : 'Desc'})
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.dangerButton} onPress={borrarTodo}>
+            <Text style={styles.buttonText}>Borrar Todo</Text>
+          </TouchableOpacity>
         </View>
 
         {direcciones.map((item, index) => (
@@ -201,36 +190,67 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-    backgroundColor: '#ffffff',
+    backgroundColor: coloresCorporativos.fondo,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 10,
     textAlign: 'center',
-    color: '#004d66',
+    color: coloresCorporativos.azulRey,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#aaa',
+    borderColor: coloresCorporativos.gris,
     padding: 10,
-    borderRadius: 10,
+    borderRadius: 8,
+    marginBottom: 10,
+    backgroundColor: '#fff',
+  },
+  addButton: {
+    backgroundColor: coloresCorporativos.verde,
+    borderRadius: 8,
+    paddingVertical: 8,
+    alignItems: 'center',
     marginBottom: 10,
   },
   buttonRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    gap: 10,
     marginVertical: 10,
+  },
+  secondaryButton: {
+    backgroundColor: coloresCorporativos.azulRey,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    flex: 1,
+    alignItems: 'center',
+    marginRight: 5,
+  },
+  dangerButton: {
+    backgroundColor: '#dc3545',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    flex: 1,
+    alignItems: 'center',
+    marginLeft: 5,
+  },
+  buttonText: {
+    color: coloresCorporativos.textoClaro,
+    fontSize: 14,
+    fontWeight: 'bold',
   },
   item: {
     backgroundColor: '#fff',
     padding: 10,
-    borderRadius: 10,
+    borderRadius: 8,
     marginVertical: 5,
   },
   dir: {
     fontSize: 16,
-    flexShrink: 1,
   },
   navButtons: {
     flexDirection: 'row',
@@ -239,19 +259,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   link: {
-    color: '#0066cc',
+    color: coloresCorporativos.azulRey,
     textDecorationLine: 'underline',
     marginHorizontal: 5,
   },
   deleteButton: {
-    backgroundColor: '#dc3545',
+    backgroundColor: '#999',
     paddingVertical: 5,
     paddingHorizontal: 10,
     borderRadius: 5,
-    marginLeft: 5,
   },
   deleteButtonText: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 12,
   },
 });

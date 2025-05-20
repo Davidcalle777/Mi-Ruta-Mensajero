@@ -1,58 +1,91 @@
 import { useState } from 'react';
-import { Alert, Button, Linking, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import axios from 'axios';
+import {
+  Button,
+  Linking,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  Alert
+} from 'react-native';
 
-const OPENCAGE_API_KEY = '02693cf849024a108afc12ce2a4403a4'; // reemplaza por la tuya
+function parseDireccionPrecisa(direccion) {
+  const regex = /\b(Calle|Cl|Cll|Carrera|Cra|Cr|Diagonal|Dg|Transversal|Tv)\s*(\d+)\s*([A-Z]{0,3})?\s*#\s*(\d+)\s*([A-Z]{0,3})?\s*(?:-|)?\s*(\d+)/i;
+  const match = direccion.match(regex);
+  if (!match) return null;
 
-const geocodeDireccion = async (direccion) => {
-  const url = `https://api.opencagedata.com/geocode/v1/json?q=${encodeURIComponent(direccion + ', Medellín, Colombia')}&key=${OPENCAGE_API_KEY}`;
-  const response = await axios.get(url);
-  const { results } = response.data;
-  if (results.length > 0) {
-    const { lat, lng } = results[0].geometry;
-    return { lat, lng, direccion };
-  } else {
-    throw new Error('No se encontró la dirección');
+  let tipo = match[1].toLowerCase();
+  const viaNum = parseInt(match[2]);
+  const viaLetra = (match[3] || '').toUpperCase();
+  const interseccionNum = parseInt(match[4]);
+  const interseccionLetra = (match[5] || '').toUpperCase();
+  const puerta = parseInt(match[6]);
+
+  const normalizados = {
+    'cl': 'Calle',
+    'cll': 'Calle',
+    'calle': 'Calle',
+    'cra': 'Carrera',
+    'cr': 'Carrera',
+    'carrera': 'Carrera',
+    'dg': 'Diagonal',
+    'diagonal': 'Diagonal',
+    'tv': 'Transversal',
+    'transversal': 'Transversal'
+  };
+
+  tipo = normalizados[tipo] || tipo;
+
+  let calle = null;
+  let carrera = null;
+
+  if (tipo === 'Calle') {
+    calle = viaNum;
+    carrera = interseccionNum;
+  } else if (tipo === 'Carrera') {
+    carrera = viaNum;
+    calle = interseccionNum;
   }
-};
 
-//Usa esta función para ordenar las direcciones por cercanía
-const ordenarPorRuta = async () => {
-  try {
-    const coordenadas = await Promise.all(
-      direcciones.map(dir => geocodeDireccion(dir))
-    );
+  return {
+    original: direccion,
+    tipo,
+    viaNum,
+    viaLetra,
+    interseccionNum,
+    interseccionLetra,
+    puerta,
+    calle,
+    carrera
+  };
+}
 
-    const origen = coordenadas[0];
-
-    const calcularDistancia = (a, b) => {
-      const dx = a.lat - b.lat;
-      const dy = a.lng - b.lng;
-      return Math.sqrt(dx * dx + dy * dy);
-    };
-
-    const ordenadas = [origen];
-    const restantes = coordenadas.slice(1);
-
-    while (restantes.length > 0) {
-      const ultimo = ordenadas[ordenadas.length - 1];
-      let masCerca = 0;
-      for (let i = 1; i < restantes.length; i++) {
-        if (
-          calcularDistancia(ultimo, restantes[i]) <
-          calcularDistancia(ultimo, restantes[masCerca])
-        ) {
-          masCerca = i;
-        }
-      }
-      ordenadas.push(restantes.splice(masCerca, 1)[0]);
-    }
-
-    setDirecciones(ordenadas.map(p => p.direccion));
-  } catch (error) {
-    alert('Error al ordenar: ' + error.message);
+function compararDirecciones(a, b) {
+  if (a.tipo !== b.tipo) {
+    return a.tipo.localeCompare(b.tipo);
   }
-};
+
+  if (a.viaNum !== b.viaNum) {
+    return a.viaNum - b.viaNum;
+  }
+
+  if (a.viaLetra !== b.viaLetra) {
+    return a.viaLetra.localeCompare(b.viaLetra);
+  }
+
+  if (a.interseccionNum !== b.interseccionNum) {
+    return a.interseccionNum - b.interseccionNum;
+  }
+
+  if (a.interseccionLetra !== b.interseccionLetra) {
+    return a.interseccionLetra.localeCompare(b.interseccionLetra);
+  }
+
+  return a.puerta - b.puerta;
+}
 
 export default function App() {
   const [direccion, setDireccion] = useState('');
@@ -60,91 +93,54 @@ export default function App() {
   const [ascendente, setAscendente] = useState(true);
 
   const agregarDireccion = () => {
-    if (direccion.trim() === '') return;
-    setDirecciones([...direcciones, direccion.trim()]);
+    const dirTrimmed = direccion.trim();
+
+    if (dirTrimmed === '') return;
+
+    // Verificar si ya existe (sin alertas)
+    const yaExiste = direcciones.some(d => d.trim().toLowerCase() === dirTrimmed.toLowerCase());
+    if (yaExiste) {
+      setDireccion('');
+      return;
+    }
+
+    setDirecciones([...direcciones, dirTrimmed]);
     setDireccion('');
   };
 
   const borrarDireccion = (index) => {
-    if (Platform.OS === 'web') {
-      if (window.confirm("¿Borrar esta dirección?")) {
-        const nuevasDirecciones = [...direcciones];
-        nuevasDirecciones.splice(index, 1);
-        setDirecciones(nuevasDirecciones);
-      }
-    } else {
-      Alert.alert("Confirmar", "¿Borrar esta dirección?", [
-        { text: "Cancelar", style: "cancel" },
-        { text: "Borrar", onPress: () => {
-          const nuevasDirecciones = [...direcciones];
-          nuevasDirecciones.splice(index, 1);
-          setDirecciones(nuevasDirecciones);
-        }}
-      ]);
-    }
+    const nuevasDirecciones = [...direcciones];
+    nuevasDirecciones.splice(index, 1);
+    setDirecciones(nuevasDirecciones);
   };
 
   const ordenarDirecciones = () => {
-    const TIPOS_ORDEN = ['avenida', 'av', 'carrera', 'cra', 'calle', 'cl', 'diagonal', 'dg', 'transversal', 'tv', 'circular', 'cir', 'otros'];
+    const direccionesParseadas = direcciones.map(d => ({
+      original: d,
+      parsed: parseDireccionPrecisa(d),
+    }));
 
-    const normalizarTipo = (texto) => {
-      const tipoEncontrado = TIPOS_ORDEN.find(tipo => texto.startsWith(tipo));
-      return tipoEncontrado || 'otros';
-    };
+    const conParseo = direccionesParseadas.filter(d => d.parsed !== null);
+    const sinParseo = direccionesParseadas.filter(d => d.parsed === null);
 
-    const parseDireccion = (dir) => {
-      const texto = dir.toLowerCase().replace(/\./g, '').trim();
+    conParseo.sort((a, b) =>
+      ascendente
+        ? compararDirecciones(a.parsed, b.parsed)
+        : compararDirecciones(b.parsed, a.parsed)
+    );
 
-      const tipo = normalizarTipo(texto);
-      const tipoIndex = TIPOS_ORDEN.indexOf(tipo);
+    const listaOrdenada = [...conParseo, ...sinParseo].map(d => d.original);
 
-      const matchNumero = texto.match(/\d+/);
-      const numero = matchNumero ? parseInt(matchNumero[0]) : 0;
-
-      const matchCasa = texto.match(/#\s*(\d+)/);
-      const numeroCasa = matchCasa ? parseInt(matchCasa[1]) : 0;
-
-      return {
-        tipo,
-        tipoIndex,
-        numero,
-        numeroCasa,
-        original: dir,
-      };
-    };
-
-    const ordenadas = [...direcciones]
-      .map(parseDireccion)
-      .sort((a, b) => {
-        if (a.tipoIndex !== b.tipoIndex) {
-          return ascendente ? a.tipoIndex - b.tipoIndex : b.tipoIndex - a.tipoIndex;
-        }
-        if (a.numero !== b.numero) {
-          return ascendente ? a.numero - b.numero : b.numero - a.numero;
-        }
-        return ascendente ? a.numeroCasa - b.numeroCasa : b.numeroCasa - a.numeroCasa;
-      })
-      .map(d => d.original);
-
-    setDirecciones(ordenadas);
+    setDirecciones(listaOrdenada);
     setAscendente(!ascendente);
   };
 
   const borrarTodo = () => {
-    if (Platform.OS === 'web') {
-      if (window.confirm("¿Borrar todas las direcciones?")) {
-        setDirecciones([]);
-      }
-    } else {
-      Alert.alert("Confirmar", "¿Borrar todas las direcciones?", [
-        { text: "Cancelar", style: "cancel" },
-        { text: "Borrar", onPress: () => setDirecciones([]) }
-      ]);
-    }
+    setDirecciones([]);
   };
 
   const abrirNavegador = (direccion, navegador) => {
-    const query = encodeURIComponent(direccion + ', Valle de Aburrá, Colombia');
+    const query = encodeURIComponent(direccion + ', Medellín, Colombia');
     let url = '';
 
     if (navegador === 'google') {
@@ -153,7 +149,9 @@ export default function App() {
       url = `https://waze.com/ul?q=${query}`;
     }
 
-    Linking.openURL(url).catch(err => Alert.alert("Error", "No se pudo abrir el navegador"));
+    Linking.openURL(url).catch(() =>
+      Alert.alert("Error", "No se pudo abrir el navegador")
+    );
   };
 
   return (
@@ -172,7 +170,7 @@ export default function App() {
 
         <View style={styles.buttonRow}>
           <Button title={`Ordenar (${ascendente ? 'Asc' : 'Desc'})`} onPress={ordenarDirecciones} />
-          
+          <Button title="Borrar Todo" onPress={borrarTodo} />
         </View>
 
         {direcciones.map((item, index) => (
@@ -191,7 +189,6 @@ export default function App() {
             </View>
           </View>
         ))}
-
       </View>
     </ScrollView>
   );
@@ -201,14 +198,51 @@ const styles = StyleSheet.create({
   scrollContainer: {
     flexGrow: 1,
   },
-  container: { flex: 1, padding: 20, backgroundColor: '#ffffff' },
-  title: { fontSize: 24, fontWeight: 'bold', marginBottom: 10, textAlign: 'center', color: '#004d66' },
-  input: { borderWidth: 1, borderColor: '#aaa', padding: 10, borderRadius: 10, marginBottom: 10 },
-  buttonRow: { flexDirection: 'row', justifyContent: 'space-between', marginVertical: 10 },
-  item: { backgroundColor: '#fff', padding: 10, borderRadius: 10, marginVertical: 5 },
-  dir: { fontSize: 16, flexShrink: 1 },
-  navButtons: { flexDirection: 'row', justifyContent: 'space-around', marginTop: 5, alignItems: 'center' },
-  link: { color: '#0066cc', textDecorationLine: 'underline', marginHorizontal: 5 },
+  container: {
+    flex: 1,
+    padding: 20,
+    backgroundColor: '#ffffff',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    textAlign: 'center',
+    color: '#004d66',
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#aaa',
+    padding: 10,
+    borderRadius: 10,
+    marginBottom: 10,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginVertical: 10,
+  },
+  item: {
+    backgroundColor: '#fff',
+    padding: 10,
+    borderRadius: 10,
+    marginVertical: 5,
+  },
+  dir: {
+    fontSize: 16,
+    flexShrink: 1,
+  },
+  navButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 5,
+    alignItems: 'center',
+  },
+  link: {
+    color: '#0066cc',
+    textDecorationLine: 'underline',
+    marginHorizontal: 5,
+  },
   deleteButton: {
     backgroundColor: '#dc3545',
     paddingVertical: 5,

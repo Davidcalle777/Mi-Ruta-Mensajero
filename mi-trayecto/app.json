@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "MiRutaMensajero",
-    "slug": "MiRutaMensajero",
+    "name": "mi-trayecto",
+    "slug": "mi-trayecto",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "mirutamensajero",
+    "scheme": "mitrayecto",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -17,7 +17,7 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.david7777777.MiRutaMensajero"
+      "package": "com.juan_calle.mitrayecto"
     },
     "web": {
       "bundler": "metro",
@@ -42,13 +42,8 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "21b3e232-b478-4590-a1c7-fdf084d0b588"
+        "projectId": "0a0fec49-e9da-43ed-a5b5-0524e405d0e3"
       }
-    },
-    "runtimeVersion": "1.0.0",
-    "updates": {
-      "url": "https://u.expo.dev/21b3e232-b478-4590-a1c7-fdf084d0b588"
-    },
-    "owner": "juan_calle"
+    }
   }
 }
